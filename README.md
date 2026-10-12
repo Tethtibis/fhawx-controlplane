@@ -1,14 +1,17 @@
-# Control-Plane Dampening for Odysseus & Ajax: Consumer Hardware Optimization
+# Architecture Over Model Size: Control-Plane Dampening for Odysseus & Ajax
 
-**Empirical benchmarks and drop-in reliability middleware for running Odysseus and Ajax on sub-14B models and 8-year-old consumer GPUs (NVIDIA GTX 1080 Ti / Pascal).**
+**Proving how modular systems engineering solves agent reliability, syntax collapse, and memory bloat on sub-14B models—without modifying the LLM or touching Odysseus source code.**
 
 ---
 
-## 1. The Core Problem on Budget Consumer Hardware
-Frontier SaaS models (Claude 3.5 Sonnet, Gemini 2.5 Pro) mask architectural entropy behind massive context windows and hundreds of billions of parameters. When running **Odysseus** and **Ajax** locally on consumer hardware:
-1. **JSON Schema Bloat:** Standard OpenAI function calling requires injecting verbose JSON schemas on every turn, consuming 400–1,500 prompt tokens per interaction and slowing down inference on Pascal/Ampere GPUs.
-2. **Escaping Syntax Collapse:** Sub-14B models (~9B) frequently fail when generating nested JSON containing escaped quotes, regex, or shell pipes (`awk`, `grep`), causing tool execution to crash.
-3. **KV-Cache Memory Bloat:** Unbounded conversation histories cause the GPU KV-cache to balloon, triggering Out-Of-Memory (OOM) errors or severe thermal CPU offloading on 11GB VRAM cards.
+## 1. The Core Philosophy: Systems Engineering vs. Parameter Scaling
+
+The modern AI industry reflex to agentic fragility is to throw more parameters at the problem—scaling to massive 200B+ frontier models or attempting costly fine-tuning. In physical systems engineering, however, you do not fix a vibrating chassis by carving a new shape of tire; you install shock absorbers.
+
+When running local agents (sub-14B) on consumer hardware:
+* **The LLM is the wheel:** A probabilistic rotational engine that works as designed.
+* **The Breakdown is Mechanical Vibration (Entropy):** Probabilistic drift compounds across multi-turn trajectories until tool schemas crash, context rots, and VRAM balloons.
+* **The Solution:** By decoupling the architecture into modular external nodes (T0 Invariant Kernel, T1 Memory Bus, Delimited Delimiters, and RRS compression), we regulate the linear event pipeline. We absorb entropy before it can shatter the runtime.
 
 ---
 
