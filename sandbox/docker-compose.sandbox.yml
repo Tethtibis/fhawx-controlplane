@@ -1,0 +1,41 @@
+services:
+  odysseus:
+    image: ghcr.io/odysseus-dev/odysseus:latest
+    container_name: odysseus_sandbox
+    restart: unless-stopped
+    ports:
+      # Expose Web UI on port 7000
+      - "0.0.0.0:7000:7000"
+    environment:
+      - AUTH_ENABLED=true
+      - LOCALHOST_BYPASS=false
+      - NODE_ENV=production
+      # Point to host inference endpoint (Ajax model via llama-server / Ollama)
+      - OPENAI_API_BASE=http://172.28.0.1:8080/v1
+      - OPENAI_API_KEY=local-sandbox-key
+      - DEFAULT_MODEL=ajax
+    volumes:
+      # Strictly isolated scratch space - ZERO host root/home mounts
+      - ./workspace:/workspace:rw
+    deploy:
+      resources:
+        limits:
+          cpus: '4.0'
+          memory: 16G
+        reservations:
+          cpus: '1.0'
+          memory: 2G
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      sandbox_net:
+        ipv4_address: 172.28.0.2
+
+networks:
+  sandbox_net:
+    driver: bridge
+    ipam:
+      driver: default
+      config:
+        - subnet: 172.28.0.0/24
+          gateway: 172.28.0.1
