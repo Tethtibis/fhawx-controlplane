@@ -1,6 +1,6 @@
-# Architecture Over Model Size: Control-Plane Dampening for Odysseus & Ajax
+# Fhawx ControlPlane for Odysseus & Ajax
 
-**Proving how modular systems engineering solves agent reliability, syntax collapse, and memory bloat on sub-14B models—without modifying the LLM or touching Odysseus source code.**
+**A drop-in modular control-plane middleware proving that systemic architecture beats parameter scaling—eliminating tool syntax crashes and memory bloat on sub-14B models without touching the LLM or modifying Odysseus.**
 
 ---
 
