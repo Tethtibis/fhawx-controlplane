@@ -7,35 +7,71 @@
 
 set -euo pipefail
 
+ACTION="${1:-enable}"
 SUBNET="172.28.0.0/24"
 HOST_GW="172.28.0.1"
 INFERENCE_PORT="8080"
+CHAIN_NAME="ODYSSEUS_WALL"
 
-echo "[*] Initializing Network Wall for Odysseus Sandbox (${SUBNET})..."
-
-# Ensure iptables is available
 if ! command -v iptables &>/dev/null; then
     echo "[!] Error: iptables not found on host."
     exit 1
 fi
 
-# 1. Allow established and related connections (so responses to inbound UI traffic work)
-sudo iptables -I FORWARD 1 -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT || true
+case "${ACTION}" in
+    enable|start|on)
+        echo "[*] Enforcing Network Wall for Odysseus Sandbox (${SUBNET})..."
+        # Create chain if it doesn't exist, flush it if it does
+        sudo iptables -N "${CHAIN_NAME}" 2>/dev/null || sudo iptables -F "${CHAIN_NAME}"
+        
+        # Ensure chain is hooked into FORWARD at top
+        if ! sudo iptables -C FORWARD -j "${CHAIN_NAME}" 2>/dev/null; then
+            sudo iptables -I FORWARD 1 -j "${CHAIN_NAME}"
+        fi
 
-# 2. Allow container to access host inference port strictly on the gateway
-sudo iptables -I FORWARD 2 -s "${SUBNET}" -d "${HOST_GW}" -p tcp --dport "${INFERENCE_PORT}" -j ACCEPT || true
+        # 1. Allow established and related connections
+        sudo iptables -A "${CHAIN_NAME}" -m conntrack --ctstate ESTABLISHED,RELATED -j ACCEPT
 
-# 3. Block all NEW outbound connections initiated by the sandbox to the local home network (192.168.0.0/16)
-sudo iptables -I FORWARD 3 -s "${SUBNET}" -d 192.168.0.0/16 -m conntrack --ctstate NEW -j DROP || true
+        # 2. Allow container to access host inference port strictly on the gateway
+        sudo iptables -A "${CHAIN_NAME}" -s "${SUBNET}" -d "${HOST_GW}" -p tcp --dport "${INFERENCE_PORT}" -j ACCEPT
 
-# 4. Block all NEW outbound connections to standard private network ranges (RFC 1918)
-sudo iptables -I FORWARD 4 -s "${SUBNET}" -d 10.0.0.0/8 -m conntrack --ctstate NEW -j DROP || true
-sudo iptables -I FORWARD 5 -s "${SUBNET}" -d 172.16.0.0/12 -m conntrack --ctstate NEW -j DROP || true
+        # 3. Block all NEW outbound connections to local home network
+        sudo iptables -A "${CHAIN_NAME}" -s "${SUBNET}" -d 192.168.0.0/16 -m conntrack --ctstate NEW -j DROP
 
-# 5. Block Link-Local / Multicast discovery (mDNS / SSDP / LLMNR)
-sudo iptables -I FORWARD 6 -s "${SUBNET}" -d 224.0.0.0/4 -j DROP || true
-sudo iptables -I FORWARD 7 -s "${SUBNET}" -d 169.254.0.0/16 -j DROP || true
+        # 4. Block all NEW outbound connections to private network ranges
+        sudo iptables -A "${CHAIN_NAME}" -s "${SUBNET}" -d 10.0.0.0/8 -m conntrack --ctstate NEW -j DROP
+        sudo iptables -A "${CHAIN_NAME}" -s "${SUBNET}" -d 172.16.0.0/12 -m conntrack --ctstate NEW -j DROP
 
-echo "[+] Network Wall enforced successfully."
-echo "    - Host Inference (port ${INFERENCE_PORT}): ALLOWED"
-echo "    - Private LAN (192.168.0.0/16, 10.0.0.0/8, 172.16.0.0/12): BLOCKED (DROP)"
+        # 5. Block Link-Local / Multicast discovery
+        sudo iptables -A "${CHAIN_NAME}" -s "${SUBNET}" -d 224.0.0.0/4 -j DROP
+        sudo iptables -A "${CHAIN_NAME}" -s "${SUBNET}" -d 169.254.0.0/16 -j DROP
+
+        echo "[+] Network Wall enforced successfully in chain ${CHAIN_NAME}."
+        ;;
+
+    disable|stop|off)
+        echo "[*] Tearing down Network Wall for Odysseus Sandbox..."
+        # Remove jump from FORWARD
+        while sudo iptables -C FORWARD -j "${CHAIN_NAME}" 2>/dev/null; do
+            sudo iptables -D FORWARD -j "${CHAIN_NAME}" 2>/dev/null || break
+        done
+        # Flush and delete user chain
+        sudo iptables -F "${CHAIN_NAME}" 2>/dev/null || true
+        sudo iptables -X "${CHAIN_NAME}" 2>/dev/null || true
+        echo "[+] Network Wall removed cleanly."
+        ;;
+
+    status)
+        if sudo iptables -L "${CHAIN_NAME}" -n >/dev/null 2>&1; then
+            echo "[+] Network Wall is ACTIVE."
+            sudo iptables -L "${CHAIN_NAME}" -n -v --line-numbers
+        else
+            echo "[-] Network Wall is INACTIVE."
+        fi
+        ;;
+
+    *)
+        echo "Usage: $0 {enable|disable|status}"
+        exit 1
+        ;;
+esac

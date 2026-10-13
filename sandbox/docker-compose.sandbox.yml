@@ -2,7 +2,7 @@ services:
   odysseus:
     image: ghcr.io/odysseus-dev/odysseus:latest
     container_name: odysseus_sandbox
-    restart: unless-stopped
+    restart: "no"
     ports:
       # Expose Web UI on port 7000
       - "0.0.0.0:7000:7000"
